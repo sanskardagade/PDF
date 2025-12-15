@@ -1,20 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 import WebViewer from '@pdftron/webviewer';
+import { set, get } from 'idb-keyval';
 import './App.css';
+
+const DRAFT_KEY = 'ship-pdf-draft';
 
 const App: React.FC = () => {
   const viewerRef = useRef<HTMLDivElement | null>(null);
   const [instance, setInstance] = useState<any>(null);
 
   useEffect(() => {
-    if (!viewerRef.current) return;
+    if (!viewerRef.current || instance) return;
 
     WebViewer(
       {
         path: '/webviewer/lib',
-        initialDoc: '/sample.pdf',
+        // initialDoc: '/sample.pdf',
         licenseKey: process.env.REACT_APP_WEBVIEWER_LICENSE_KEY as string,
-        preloadWorker: 'contentEdit', // optional but helps for text edit
+        preloadWorker: 'contentEdit',
       },
       viewerRef.current
     ).then((inst) => {
@@ -22,20 +25,17 @@ const App: React.FC = () => {
       const { documentViewer } = inst.Core;
       const { UI } = inst;
 
-      // Enable content editing tools (edit existing PDF text/images)
-      UI.enableFeatures([UI.Feature.ContentEdit]);          // enables edit feature [web:35][web:115]
-      UI.enableElements(['contentEditButton']);             // show "Edit Content" button [web:119]
-
-      // Optional: switch toolbar to text-edit group so tools are visible
+      UI.enableFeatures([UI.Feature.ContentEdit]);
+      UI.enableElements(['contentEditButton']);
       if (UI.setToolbarGroup) {
-        UI.setToolbarGroup('toolbarGroup-EditText');        // predefined edit toolbar [web:129]
+        UI.setToolbarGroup('toolbarGroup-EditText');
       }
 
       documentViewer.addEventListener('documentLoaded', () => {
         console.log('Document loaded');
       });
     });
-  }, []);
+  }, [instance]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!instance || !e.target.files || e.target.files.length === 0) return;
@@ -58,10 +58,57 @@ const App: React.FC = () => {
     a.click();
   };
 
+  // const saveDraft = async () => {
+  //   if (!instance) return;
+  //   const { documentViewer, annotationManager } = instance.Core;
+  //   const doc = documentViewer.getDocument();
+  //   const xfdfString = await annotationManager.exportAnnotations();
+  //   const data = await doc.getFileData({ xfdfString });
+  //   const blob = new Blob([new Uint8Array(data)], { type: 'application/pdf' });
+
+  //   await set(DRAFT_KEY, blob);
+  //   alert('Draft saved offline');
+  // };
+
+  const saveDraft = async () => {
+  if (!instance) return;
+
+  const { documentViewer, annotationManager } = instance.Core;
+
+  // Make sure a document is actually loaded
+  const doc = documentViewer.getDocument();
+  if (!doc) {
+    alert('No document loaded to save');
+    return;
+  }
+
+  const xfdfString = await annotationManager.exportAnnotations();
+  const data = await doc.getFileData({ xfdfString });
+  const blob = new Blob([new Uint8Array(data)], { type: 'application/pdf' });
+
+  console.log('Draft size (bytes):', blob.size);
+  await set(DRAFT_KEY, blob);
+  alert('Draft saved offline');
+};
+
+
+  const loadDraft = async () => {
+    if (!instance) return;
+    const blob = await get(DRAFT_KEY);
+    if (!blob) {
+      alert('No draft found');
+      return;
+    }
+    const { UI } = instance;
+    UI.loadDocument(blob, { filename: 'draft.pdf' });
+  };
+
   return (
     <div className="App">
       <header className="toolbar">
         <input type="file" accept="application/pdf" onChange={handleFileChange} />
+        <button onClick={saveDraft}>Save Draft (Offline)</button>
+        <button onClick={loadDraft}>Load Draft</button>
         <button onClick={handleDownload}>Download Edited PDF</button>
       </header>
       <div className="webviewer" ref={viewerRef} style={{ height: '90vh' }} />
@@ -70,6 +117,7 @@ const App: React.FC = () => {
 };
 
 export default App;
+
 
 // import React, { useEffect, useRef, useState } from 'react';
 // import WebViewer from '@pdftron/webviewer';
