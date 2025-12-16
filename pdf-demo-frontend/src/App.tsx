@@ -15,8 +15,7 @@ const App: React.FC = () => {
     WebViewer(
       {
         path: '/webviewer/lib',
-        // initialDoc: '/sample.pdf',
-        licenseKey: process.env.REACT_APP_WEBVIEWER_LICENSE_KEY as string,
+        licenseKey: 'demo:1765869143406:60cf5dea0300000000ab93f17aeae30f394a365a17ee06e0ed201972b4',
         preloadWorker: 'contentEdit',
       },
       viewerRef.current
